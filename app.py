@@ -126,18 +126,18 @@ def main():
     # Introduzione
     st.markdown("""
     ### Il Modello del Self-Empowerment
-    Il modello di riferimento (Bruscaglioni e Gheno) definisce il potere personale come la possibilità di aprire nuove possibilità. 
-    Si basa su 4 fasi operative cicliche:
+    Il nostro modello di riferimento (Bruscaglioni e Gheno, 2000) definisce il potere personale come il sentimento di disporre di nuove possibilità di essere e di agire. 
+    Il processo di apertura di nuove possibilità psicologiche si basa su 4 fasi operative in rapporto circolare tra loro:
     
-    1.  **Dialettica Bisogno-Desiderio**: All'emergere di un bisogno si attiva la funzione desiderante.
-    2.  **Pensabilità Positiva**: Il desiderio diventa progetto.
-    3.  **Mobilitazione delle Risorse**: Ricerca delle risorse interne ed esterne.
-    4.  **Depotenziamento dei Killer**: Superamento degli ostacoli soggettivi (es. "non sono capace", "è colpa degli altri").
+    1.  **Dialettica Bisogno-Desiderio**: All'emergere di un bisogno si attiva la funzione desiderante dell'io.
+    2.  **Pensabilità Positiva**: Il desiderio diventa progetto personale.
+    3.  **Mobilitazione delle Risorse**: Ricerca delle risorse interne ed esterne al soggetto.
+    4.  **Depotenziamento dei Killer**: Superamento degli ostacoli soggettivi (es. "non ci sono risorse", "non si può fare", "non sono capace", "è colpa degli altri").
     
-    **Obiettivo:** Riflettere sul proprio sentimento di potere personale, inteso come capacità di incidere sulla realtà e realizzare i propri desideri.
+    **Obiettivo:** Riflettere sul proprio sentimento di potere personale, inteso come competenza utile ad incidere sulla realtà e a realizzare i propri desideri.
     """)
     
-    st.info("Proseguendo nella compilazione acconsento a che i dati raccolti potranno essere utilizzati in forma aggregata esclusivamente per finalità statistiche")
+    st.info("Avvertenza: proseguendo nella compilazione acconsento a che i dati raccolti potranno essere utilizzati in forma aggregata esclusivamente per finalità statistiche")
 
     if 'submitted' not in st.session_state:
         st.session_state.submitted = False
@@ -212,12 +212,12 @@ def main():
         messaggio = ""
         if media <= 3:
             messaggio = "🔴 **Basso livello di self-empowerment.** Rischio di consolidare un sentimento di impotenza."
-        elif 3.1 <= media <= 4.4:
+        elif 3.1 <= media < 4:
             messaggio = "🟡 **Livello medio di self-empowerment.** Non aver paura di investire di più su ciò che desideri."
-        elif 4.5 <= media <= 5.5:
+        elif 4 < media <= 4.5:
             messaggio = "🟢 **Livello alto di self-empowerment.** I tuoi limiti non sono un freno, a patto che tieni “acceso” il desiderio."
-        else: # > 5.5 (Tecnicamente impossibile su scala 1-5, ma inserito per specifica)
-            messaggio = "🌟 **Livello molto alto di self-empowerment.** Tutto bene a patto che tu non ti creda onnipotente: un buon esame di realtà è fondamentale."
+        else: # > 4.5 
+            messaggio = "🌟 **Livello molto alto di self-empowerment.** Tutto bene, a patto che tu non ti creda onnipotente: un buon esame di realtà è fondamentale."
         
         st.markdown(f"### {messaggio}")
 
