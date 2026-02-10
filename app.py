@@ -18,14 +18,14 @@ OPZIONI_LIKERT = {
 
 # Elenco Item (Testo)
 ITEMS = [
-    "1. Generalmente mi sembra di avere molti desideri",
+    "1. Generalmente ho molti desideri",
     "2. È meglio concentrarsi sul presente, senza fare troppi progetti futuri",
     "3. Generalmente mi sento privo di risorse",
     "4. Generalmente sento di avere molta influenza su ciò che mi accade nel lavoro",
     "5. Se penso alla mia vita professionale, mi sembra che nel tempo le mie possibilità siano aumentate",
     "6. È meglio restare coi piedi per terra, evitando di avere troppi desideri",
     "7. Generalmente mi è difficile pensarmi in circostanze future",
-    "8. Se mi venissero fornite più risorse potrei perseguire i miei desideri",
+    "8. Per perseguire i miei desideri avrei bisogno che mi venissero fornite più risorse",
     "9. Generalmente mi sembra di imparare e di crescere nel lavoro",
     "10. Più uno cresce e più aumentano i vincoli e diminuiscono le possibilità",
     "11. Se penso alla mia vita professionale, credo sia importante perseguire i propri desideri",
