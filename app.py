@@ -19,25 +19,25 @@ OPZIONI_LIKERT = {
 # Elenco Item (Testo)
 ITEMS = [
     "1. Generalmente ho molti desideri",
-    "2. È meglio concentrarsi sul presente, senza fare troppi progetti futuri",
-    "3. Generalmente mi sento privo di risorse",
-    "4. Generalmente sento di avere molta influenza su ciò che mi accade nel lavoro",
+    "2. È meglio non fare troppi progetti futuri, ma  concentrarsi sul presente",
+    "3. Generalmente mi sembra di non avere risorse",
+    "4. Generalmente mi sembra di avere molta influenza su ciò che mi accade nel lavoro",
     "5. Se penso alla mia vita professionale, mi sembra che nel tempo le mie possibilità siano aumentate",
-    "6. È meglio restare coi piedi per terra, evitando di avere troppi desideri",
-    "7. Generalmente mi è difficile pensarmi in circostanze future",
+    "6. È meglio evitare di avere troppi desideri e restare invece coi piedi per terra",
+    "7. Generalmente faccio fatica a pensarmi in circostanze future",
     "8. Per perseguire i miei desideri avrei bisogno che mi venissero fornite più risorse",
     "9. Generalmente mi sembra di imparare e di crescere nel lavoro",
-    "10. Più uno cresce e più aumentano i vincoli e diminuiscono le possibilità",
+    "10. Più uno cresce, più aumentano i vincoli e diminuiscono le possibilità",
     "11. Se penso alla mia vita professionale, credo sia importante perseguire i propri desideri",
     "12. Mi piace ciò che immagino del mio futuro",
-    "13. Le risorse per perseguire i miei desideri sono innanzitutto mie",
+    "13. Le risorse per perseguire i miei desideri sono innanzitutto le mie",
     "14. Generalmente mi sembra di realizzare qualcosa di buono con il mio lavoro",
     "15. Viviamo in un mondo ricco di possibilità, anche professionali",
     "16. Nella vita sono più importanti i desideri dei bisogni",
     "17. Se penso al mio futuro, mi è facile vedere i miei desideri realizzati",
     "18. Se penso alla mia vita professionale, penso di avere molte risorse a disposizione",
     "19. Generalmente mi sembra di incidere su ciò che faccio sul lavoro",
-    "20. Generalmente ritengo di avere diverse possibilità tra cui scegliere"
+    "20. Generalmente mi sembra di poter scegliere tra diverse possibilità"
 ]
 
 # Indici degli item da reversare (l'indice parte da 1 come nel testo, nel codice verrà adattato a 0)
