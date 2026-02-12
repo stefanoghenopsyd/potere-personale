@@ -85,10 +85,10 @@ st.markdown("""
 ### Il Modello di Riferimento
 Il sentimento di potere personale (**Self-Empowerment**) è esito di un processo psicologico di apertura di nuove possibilità di essere e di agire (Bruscaglioni & Gheno, 2000).
 Si basa su 4 fasi operative:
-1.  **Dialettica bisogno-desiderio**: attivazione della funzione desiderante.
-2.  **Costruzione di una pensabilità positiva**: il desiderio diventa progetto.
-3.  **Mobilitazione delle risorse**: ricerca delle risorse interne ed esterne.
-4.  **Depotenziamento dei killer psicologici**: rimozione degli ostacoli soggettivi.
+1.  **Dialettica bisogno-desiderio**: all'emergere di un bisogno (mancanza di) si attiva la funzione desiderante della persona (tensione verso).
+2.  **Costruzione di una pensabilità positiva**: il desiderio si specifica e inizia a diventare progetto.
+3.  **Mobilitazione delle risorse**: ricerca delle risorse interne ed esterne per implementare il progetto.
+4.  **Depotenziamento dei killer psicologici**: riduzione dell'impatto degli ostacoli soggettivi che accompagnano l'attivarsi del desiderio (paure, incapacità, mancanza di autostima, sfiducia, ecc.).
 
 **Obiettivo:** Questa autovalutazione ti aiuta a riflettere su quanto ti senti dotato di potere personale, inteso come confidenza circa il disporre di possibilità di azione.
 
