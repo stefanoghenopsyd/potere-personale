@@ -1,259 +1,265 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import plotly.graph_objects as go
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+import numpy as np
 
-# --- 1. CONFIGURAZIONE E COSTANTI ---
-# Scala Likert
-OPZIONI_LIKERT = {
-    1: "Per nulla d'accordo",
-    2: "Poco d'accordo",
-    3: "Né d'accordo né in disaccordo",
-    4: "Abbastanza d'accordo",
-    5: "Totalmente d'accordo"
-}
+# --- CONFIGURAZIONE PAGINA ---
+st.set_page_config(page_title="Autovalutazione Potere Personale", layout="centered")
 
-# Elenco Item (Testo)
-ITEMS = [
-    "1. Generalmente ho molti desideri",
-    "2. È meglio non fare troppi progetti futuri, ma  concentrarsi sul presente",
-    "3. Generalmente mi sembra di non avere risorse",
-    "4. Generalmente mi sembra di avere molta influenza su ciò che mi accade nel lavoro",
-    "5. Se penso alla mia vita professionale, mi sembra che nel tempo le mie possibilità siano aumentate",
-    "6. È meglio evitare di avere troppi desideri e restare invece coi piedi per terra",
-    "7. Generalmente faccio fatica a pensarmi in circostanze future",
-    "8. Per perseguire i miei desideri avrei bisogno che mi venissero fornite più risorse",
-    "9. Generalmente mi sembra di imparare e di crescere nel lavoro",
-    "10. Più uno cresce, più aumentano i vincoli e diminuiscono le possibilità",
-    "11. Se penso alla mia vita professionale, credo sia importante perseguire i propri desideri",
-    "12. Mi piace ciò che immagino del mio futuro",
-    "13. Le risorse per perseguire i miei desideri sono innanzitutto le mie",
-    "14. Generalmente mi sembra di realizzare qualcosa di buono con il mio lavoro",
-    "15. Viviamo in un mondo ricco di possibilità, anche professionali",
-    "16. Nella vita sono più importanti i desideri dei bisogni",
-    "17. Se penso al mio futuro, mi è facile vedere i miei desideri realizzati",
-    "18. Se penso alla mia vita professionale, penso di avere molte risorse a disposizione",
-    "19. Generalmente mi sembra di incidere su ciò che faccio sul lavoro",
-    "20. Generalmente mi sembra di poter scegliere tra diverse possibilità"
-]
+# --- COLORI PERSONALIZZATI ---
+COLOR_PRIMARY = "#1E88E5" 
+COLOR_SECONDARY = "#FFC107" 
+COLOR_BG_RED = "#FFCDD2"
+COLOR_BG_GREEN = "#C8E6C9"
 
-# Indici degli item da reversare (l'indice parte da 1 come nel testo, nel codice verrà adattato a 0)
-INDICI_REVERSE = [2, 3, 6, 7, 8, 10]
+# --- FUNZIONI DI UTILITÀ ---
 
-# --- 2. FUNZIONI LOGICHE ---
-
-def salva_su_drive(riga):
-    """Tenta il salvataggio su Google Sheets."""
+def connect_to_gsheet():
+    """Connette a Google Sheet usando i Secrets di Streamlit"""
     try:
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
+        # Assicurati che il foglio si chiami esattamente così
         sheet = client.open("Database_Self_Empowerment").sheet1
-        sheet.append_row(riga)
-        return True
+        return sheet
     except Exception as e:
-        print(f"Errore salvataggio: {e}") # Log interno
-        return False
+        st.error(f"Errore connessione database: {e}")
+        return None
 
-def calcola_punteggi(risposte_raw):
-    """
-    Calcola il punteggio medio applicando il reverse agli item specifici.
-    Restituisce: media totale, lista punteggi calcolati, flag killer.
-    """
-    punteggi_calcolati = []
-    
-    # Calcolo punteggi singoli (con reverse)
-    for i, voto_raw in enumerate(risposte_raw):
-        idx_item = i + 1  # L'item 1 è all'indice 0
-        if idx_item in INDICI_REVERSE:
-            # Reverse su scala 1-5: Nuovo = 6 - Vecchio
-            punteggio = 6 - voto_raw
-        else:
-            punteggio = voto_raw
-        punteggi_calcolati.append(punteggio)
-    
-    media_totale = np.mean(punteggi_calcolati)
-    
-    # Logica Killer Psicologici
-    # "Se negli items 3, 8, 10 il punteggio medio è > 4" (Nota: Si intende il voto RAW, cioè l'accordo col killer)
-    raw_killer_group = [risposte_raw[2], risposte_raw[7], risposte_raw[9]] # Indici 2,7,9 corrispondono a item 3,8,10
-    # "e negli items 17, 18, 20 è < 3" (Voto RAW su risorse positive)
-    raw_resource_group = [risposte_raw[16], risposte_raw[17], risposte_raw[19]] # Item 17,18,20
-    
-    check_killer = (np.mean(raw_killer_group) > 4) and (np.mean(raw_resource_group) < 3)
-    
-    return media_totale, punteggi_calcolati, check_killer
+def save_data(data_row):
+    """Salva una riga di dati su Google Sheet"""
+    sheet = connect_to_gsheet()
+    if sheet:
+        try:
+            sheet.append_row(data_row)
+            return True
+        except Exception as e:
+            st.error(f"Errore salvataggio dati: {e}")
+            return False
+    return False
 
-def crea_tachimetro(valore):
-    """Genera il grafico a tachimetro con Plotly."""
+def create_gauge(value, title, min_v, max_v, ranges, colors):
+    """Crea un grafico a tachimetro (Gauge) con Plotly"""
+    
+    steps = []
+    for i in range(len(ranges)-1):
+        steps.append({'range': [ranges[i], ranges[i+1]], 'color': colors[i]})
+
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
-        value = valore,
-        domain = {'x': [0, 1], 'y': [0, 1]},
-        title = {'text': "Livello Self-Empowerment"},
+        value = value,
+        title = {'text': title},
         gauge = {
-            'axis': {'range': [1, 5.5], 'tickwidth': 1, 'tickcolor': "darkblue"},
-            'bar': {'color': "#006B54"}, # Verde GENERA
-            'bgcolor': "white",
-            'borderwidth': 2,
-            'bordercolor': "gray",
-            'steps': [
-                {'range': [1, 3], 'color': '#ffcccc'},
-                {'range': [3, 4.4], 'color': '#ffffcc'},
-                {'range': [4.4, 5.5], 'color': '#B4D8D0'} # Verde chiaro GENERA
-            ],
+            'axis': {'range': [min_v, max_v]},
+            'bar': {'color': "black"},
+            'steps': steps,
+            'threshold': {
+                'line': {'color': "red", 'width': 4},
+                'thickness': 0.75,
+                'value': value
+            }
         }
     ))
-    fig.update_layout(width=400, height=300, margin=dict(l=20, r=20, t=50, b=20))
+    fig.update_layout(height=300, margin=dict(l=20, r=20, t=50, b=20))
     return fig
 
-# --- 3. INTERFACCIA UTENTE ---
+# --- UI PRINCIPALE ---
 
-def main():
-    st.set_page_config(page_title="Self-Empowerment GENERA", layout="centered")
+# 1. HEADER E LOGO
+try:
+    st.image("GENERA Logo Colore.png", use_container_width=True) 
+except:
+    st.warning("Immagine 'GENERA Logo Colore.png' non trovata.")
 
-    # Header con Logo e Titolo responsivi
-    col_spacer_l, col_img, col_spacer_r = st.columns([1, 2, 1])
-    with col_img:
-        st.image("GENERA Logo Colore.png", use_container_width=True)
+st.title("Autovalutazione del Potere Personale")
+
+# 2. SEZIONE INTRODUTTIVA
+st.markdown("""
+### Il Modello di Riferimento
+Il sentimento di potere personale (**Self-Empowerment**) è esito di un processo psicologico di apertura di nuove possibilità di essere e di agire (Bruscaglioni & Gheno, 2000).
+Si basa su 4 fasi operative:
+1.  **Dialettica bisogno-desiderio**: attivazione della funzione desiderante.
+2.  **Costruzione di una pensabilità positiva**: il desiderio diventa progetto.
+3.  **Mobilitazione delle risorse**: ricerca delle risorse interne ed esterne.
+4.  **Depotenziamento dei killer psicologici**: rimozione degli ostacoli soggettivi.
+
+**Obiettivo:** Questa autovalutazione ti aiuta a riflettere su quanto ti senti dotato di potere personale, inteso come confidenza circa il disporre di possibilità di azione.
+
+---
+""")
+
+st.markdown("""
+<div style='background-color: #f0f2f6; padding: 10px; border-radius: 5px; font-size: 0.8em;'>
+<strong>Proseguendo nella compilazione acconsento a che i dati raccolti potranno essere utilizzati in forma aggregata esclusivamente per finalità statistiche.</strong>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("---")
+
+# 3. FORM DATI E QUESTIONARIO
+with st.form("questionario_form"):
     
-    st.markdown("<h1 style='text-align: center;'>Autovalutazione Potere Personale</h1>", unsafe_allow_html=True)
-
-    # Introduzione
-    st.markdown("""
-    ### Il Modello del Self-Empowerment
-    Il nostro modello di riferimento (Bruscaglioni e Gheno, 2000) definisce il potere personale come il sentimento di disporre di nuove possibilità di essere e di agire. 
-    Il processo di apertura di nuove possibilità psicologiche si basa su 4 fasi operative in rapporto circolare tra loro:
+    # --- ANAGRAFICA ---
+    st.subheader("Informazioni Socio-Anagrafiche")
+    col1, col2 = st.columns(2)
     
-    1.  **Dialettica Bisogno-Desiderio**: All'emergere di un bisogno si attiva la funzione desiderante dell'io.
-    2.  **Pensabilità Positiva**: Il desiderio diventa progetto personale.
-    3.  **Mobilitazione delle Risorse**: Ricerca delle risorse interne ed esterne al soggetto.
-    4.  **Depotenziamento dei Killer**: Superamento degli ostacoli soggettivi (es. "non ci sono risorse", "non si può fare", "non sono capace", "è colpa degli altri").
+    with col1:
+        nome = st.text_input("Nome o Nickname")
+        eta = st.selectbox("Età", ["fino a 20 anni", "21-30 anni", "31-40 anni", "41-50 anni", "51-60 anni", "61-70 anni", "più di 70 anni"])
+        titolo_studio = st.selectbox("Titolo di studio", ["licenza media", "qualifica professionale", "diploma di maturità", "laurea triennale", "laurea magistrale (o ciclo unico)", "titolo post lauream"])
     
-    **Obiettivo:** Riflettere sul proprio sentimento di potere personale, inteso come competenza utile ad incidere sulla realtà e a realizzare i propri desideri.
-    """)
-    
-    st.info("Avvertenza: proseguendo nella compilazione acconsento a che i dati raccolti potranno essere utilizzati in forma aggregata esclusivamente per finalità statistiche")
+    with col2:
+        genere = st.selectbox("Genere", ["maschile", "femminile", "non binario", "non risponde"])
+        job = st.selectbox("Job", ["imprenditore", "top manager", "middle manager", "impiegato", "operaio", "tirocinante", "libero professionista"])
 
-    if 'submitted' not in st.session_state:
-        st.session_state.submitted = False
-
-    if not st.session_state.submitted:
-        with st.form("form_empowerment"):
-            # Anagrafica
-            st.subheader("Dati Socio-Anagrafici")
-            nome = st.text_input("Nome o Nickname")
-            genere = st.selectbox("Genere", ["maschile", "femminile", "non binario", "non risponde"])
-            eta = st.selectbox("Età", ["fino a 20 anni", "21-30 anni", "31-40 anni", "41-50 anni", "51-60 anni", "61-70 anni", "più di 70 anni"])
-            studio = st.selectbox("Titolo di Studio", ["licenza media", "qualifica professionale", "diploma di maturità", "laurea triennale", "laurea magistrale (o ciclo unico)", "titolo post lauream"])
-            job = st.selectbox("Job", ["imprenditore", "top manager", "middle manager", "impiegato", "operaio", "tirocinante", "libero professionista"])
-
-            st.markdown("---")
-            st.subheader("Questionario")
-            st.write("Valuta le seguenti affermazioni da **Per nulla d'accordo** (1) a **Totalmente d'accordo** (5).")
-
-            risposte_raw = []
-            for item in ITEMS:
-                val = st.radio(
-                    item, 
-                    options=[1, 2, 3, 4, 5],
-                    format_func=lambda x: f"{x} - {OPZIONI_LIKERT[x]}",
-                    horizontal=True,
-                    index=None  # Nessuna preselezione
-                )
-                risposte_raw.append(val)
-
-            submitted = st.form_submit_button("Calcola il mio Profilo")
-
-            if submitted:
-                if None in risposte_raw or not nome:
-                    st.error("Per favore, compila tutti i campi e rispondi a tutte le domande.")
-                else:
-                    # Elaborazione
-                    media, punteggi_calc, is_killer_active = calcola_punteggi(risposte_raw)
-                    
-                    # Preparazione dati per DB
-                    riga_db = [nome, genere, eta, studio, job] + punteggi_calc # Salviamo i punteggi calcolati (o raw? Di solito si salvano i raw, ma qui salvo i calcolati come da richiesta implicita nel calcolo)
-                    # Nota: Per chiarezza statistica, salvo i RAW e calcolo dopo in analisi, ma la richiesta dice "punteggio attribuito". Salverò i RAW seguiti dalla Media Finale per completezza.
-                    # Riformulo come da richiesta: "punteggio attribuito a ciascun item". Salvo i RAW (quello che l'utente ha cliccato).
-                    riga_completa = [nome, genere, eta, studio, job] + risposte_raw
-
-                    saved_ok = salva_su_drive(riga_completa)
-                    
-                    st.session_state.media = media
-                    st.session_state.punteggi_calc = punteggi_calc
-                    st.session_state.is_killer_active = is_killer_active
-                    st.session_state.saved_ok = saved_ok
-                    st.session_state.riga_completa = riga_completa
-                    st.session_state.submitted = True
-                    st.rerun()
-
-    else:
-        # --- PAGINA RISULTATI ---
-        media = st.session_state.media
-        punteggi = st.session_state.punteggi_calc
-        
-        # Feedback Tecnico
-        if st.session_state.saved_ok:
-            st.success("Dati salvati correttamente.")
-        else:
-            st.warning("Impossibile salvare i dati online. Visualizza comunque il tuo feedback qui sotto.")
-
-        # 1. Grafico Tachimetro
-        st.plotly_chart(crea_tachimetro(media), use_container_width=True)
-
-        # 2. Feedback Descrittivo (Segmentazione)
-        st.subheader("Il tuo Profilo di Potere Personale")
-        
-        messaggio = ""
-        if media <= 3:
-            messaggio = "🔴 **Basso livello di self-empowerment.** Rischio di consolidare un sentimento di impotenza."
-        elif 3.1 <= media < 4:
-            messaggio = "🟡 **Livello medio di self-empowerment.** Non aver paura di investire di più su ciò che desideri."
-        elif 4 < media <= 4.5:
-            messaggio = "🟢 **Livello alto di self-empowerment.** I tuoi limiti non sono un freno, a patto che tieni “acceso” il desiderio."
-        else: # > 4.5 
-            messaggio = "🌟 **Livello molto alto di self-empowerment.** Tutto bene, a patto che tu non ti creda onnipotente: un buon esame di realtà è fondamentale."
-        
-        st.markdown(f"### {messaggio}")
-
-        # 3. Analisi Criticità (2 item più bassi)
-        st.subheader("Aree di Attenzione")
-        # Creiamo coppie (Punteggio, Testo Item)
-        lista_punteggi_testo = []
-        for i, pt in enumerate(punteggi):
-            lista_punteggi_testo.append((pt, ITEMS[i]))
-        
-        # Ordiniamo in base al punteggio (crescente)
-        lista_punteggi_testo.sort(key=lambda x: x[0])
-        worst_2 = lista_punteggi_testo[:2]
-
-        st.write("Le maggiori criticità potenziali emergono in questi ambiti:")
-        for pt, testo in worst_2:
-            st.warning(f"**{testo}** (Punteggio ricalcolato: {pt}/5)")
-
-        # 4. Check Killer Psicologici
-        if st.session_state.is_killer_active:
-            st.error("""
-            ⚠️ **Attenzione ai Killer Psicologici!** Dal tuo profilo emerge la necessità di lavorare sul depotenziamento dei tuoi ostacoli interni (es. locus of control esterno, sensazione di scarsità di risorse).
-            """)
-
-        # Download Button (Backup)
-        csv_buffer = pd.DataFrame([st.session_state.riga_completa], 
-                                  columns=["Nome", "Genere", "Età", "Studio", "Job"] + [f"Item {i+1}" for i in range(20)]).to_csv(index=False).encode('utf-8')
-        st.download_button("Scarica i tuoi risultati (CSV)", csv_buffer, "risultati_empowerment.csv", "text/csv")
-        
-        if st.button("Ricomincia"):
-            st.session_state.submitted = False
-            st.rerun()
-
-    # Footer
     st.markdown("---")
-    st.markdown("<p style='text-align: center; color: grey;'>Powered by GÉNERA</p>", unsafe_allow_html=True)
 
-if __name__ == "__main__":
-    main()
+    # --- QUESTIONARIO (SCALA LIKERT 5 PUNTI) ---
+    st.subheader("Autovalutazione")
+    st.write("Valuta le seguenti affermazioni da **1 (Per nulla d'accordo)** a **5 (Totalmente d'accordo)**.")
+    
+    domande = [
+        "1) È meglio evitare di fare troppi progetti per il futuro e concentrarsi sul presente",
+        "2) Per lo più mi sembra di avere grande influenza su ciò che mi accade sul lavoro",
+        "3) Pensando alla mia vita professionale, mi sembra che le mie possibilità siano aumentate",
+        "4) È meglio evitare di avere troppi desideri e restare coi piedi per terra",
+        "5) Per lo più mi è difficile pensarmi in circostanze future",
+        "6) Per lo più mi sembra di imparare e crescere sul lavoro",
+        "7) Per lo più mi sembra che crescendo aumentino i vincoli e diminuiscano le possibilità",
+        "8) Per lo più mi sembra di realizzare qualcosa di buono con il mio lavoro",
+        "9) Mi sembra di vivere in un mondo ricco di possibilità, anche professionali",
+        "10) Pensando al mio futuro, mi è facile vedere i miei desideri realizzati",
+        "11) Pensando alla mia vita professionale, mi sembra di avere molte risorse a disposizione",
+        "12) Per lo più mi sembra di incidere in ciò che faccio sul lavoro",
+        "13) Per lo più mi sembra di avere diverse possibilità tra cui scegliere"
+    ]
+    
+    # Scala a 5 Punti
+    opzioni = [
+        "1 - Per nulla d'accordo", 
+        "2 - Poco d'accordo", 
+        "3 - Né d'accordo né in disaccordo", # Punto Neutro aggiunto
+        "4 - Abbastanza d'accordo", 
+        "5 - Totalmente d'accordo"
+    ]
+    valori_mapping = {opzioni[0]: 1, opzioni[1]: 2, opzioni[2]: 3, opzioni[3]: 4, opzioni[4]: 5}
+    
+    risposte = {}
+    for i, domanda in enumerate(domande):
+        risposta_txt = st.select_slider(domanda, options=opzioni, key=f"q{i}")
+        risposte[i+1] = valori_mapping[risposta_txt]
+
+    submitted = st.form_submit_button("Calcola Profilo")
+
+# --- ELABORAZIONE E RISULTATI ---
+if submitted:
+    if not nome:
+        st.error("Per favore inserisci un nome o nickname.")
+    else:
+        # Indici Items (Python parte da 0)
+        idx_reverse = [1, 4, 5, 7] # Sono gli items negativi
+        idx_potere = [2, 3, 6, 8, 9, 10, 11, 12, 13]
+        idx_killer = [1, 4, 5, 7]
+
+        punteggi_calcolati = {}
+        
+        # Calcolo valori (Reverse su scala 5: 6 - voto)
+        for k, v in risposte.items():
+            if k in idx_reverse:
+                punteggi_calcolati[k] = 6 - v # FORMULA AGGIORNATA PER SCALA 5
+            else:
+                punteggi_calcolati[k] = v
+        
+        # Calcolo Medie
+        scores_list = list(punteggi_calcolati.values())
+        score_globale = np.mean(scores_list)
+        
+        # Killer Psicologico (Uso valori grezzi: alto voto = alto killer)
+        vals_killer_raw = [risposte[k] for k in idx_killer]
+        score_killer = np.mean(vals_killer_raw)
+        
+        # Sentimento Potere (Uso valori positivi)
+        vals_potere = [risposte[k] for k in idx_potere]
+        score_potere = np.mean(vals_potere)
+        
+        # --- SALVATAGGIO ---
+        user_id = datetime.now().strftime("%Y%m%d%H%M%S")
+        row_data = [user_id, nome, genere, eta, titolo_studio, job]
+        for i in range(1, 14):
+            row_data.append(risposte[i])
+            
+        save_success = save_data(row_data)
+        if not save_success:
+            st.warning("Impossibile salvare i dati, ma ecco il tuo profilo.")
+
+        # --- FEEDBACK GRAFICO ---
+        st.markdown("## Il tuo Profilo di Self-Empowerment")
+        
+        # Quadrante 1: Globale (Scala 1-5)
+        # Soglie adattate: Basso <3.5, Medio 3.5-4.4, Alto >4.5
+        fig_globale = create_gauge(
+            score_globale, 
+            "Self-Empowerment Globale", 
+            1, 5, 
+            [1, 3.5, 4.5, 5], 
+            ["#FFCDD2", "#FFF9C4", "#C8E6C9"] 
+        )
+        st.plotly_chart(fig_globale, use_container_width=True)
+
+        col_g1, col_g2 = st.columns(2)
+        
+        with col_g1:
+            # Killer Psicologico - Cutoff 3 (Invariato)
+            fig_killer = create_gauge(
+                score_killer,
+                "Killer Psicologici",
+                1, 5,
+                [1, 3, 5],
+                [COLOR_BG_GREEN, COLOR_BG_RED] 
+            )
+            st.plotly_chart(fig_killer, use_container_width=True)
+            
+        with col_g2:
+            # Sentimento di Potere - Cutoff 3 (Invariato)
+            fig_potere = create_gauge(
+                score_potere,
+                "Sentimento di Potere",
+                1, 5,
+                [1, 3, 5],
+                [COLOR_BG_RED, COLOR_BG_GREEN]
+            )
+            st.plotly_chart(fig_potere, use_container_width=True)
+
+        # --- FEEDBACK NARRATIVO ---
+        st.markdown("### Interpretazione")
+        st.info(f"Punteggio Globale: {score_globale:.2f}/5 | Potere: {score_potere:.2f}/5 | Killer: {score_killer:.2f}/5")
+
+        testo_feedback = ""
+        
+        # LOGICA SOGLIE AGGIORNATA PER SCALA 5
+        # Nota: La richiesta originale aveva soglie > 5.5, impossibile qui.
+        # Ho ricalibrato l'ultimo livello per essere raggiungibile se il punteggio è > 4.7
+        
+        if score_globale < 3.5:
+            testo_feedback = "Attenzione: è molto probabile che il tuo basso livello di self-empowerment ti impedisca di affrontare con coraggio ed energia le sfide che incontri sul cammino. Considera i punteggi del fattore potere personale e killer psicologico e valuta se la tua priorità sia rafforzare la tua auto efficacia e competenza, oppure lavorare a un depotenziamento delle difficoltà soggettive."
+        elif 3.5 <= score_globale < 4.5:
+            testo_feedback = "Bene ma non benissimo! Un livello di self-empowerment più alto potrebbe aiutarti ad affrontare le sfide in modo più coraggioso ed energico.  Considera i punteggi del fattore potere personale e killer psicologico e valuta se la tua priorità sia rafforzare la tua auto efficacia e competenza, oppure lavorare a un migliore depotenziamento delle difficoltà soggettive."
+        elif 4.5 <= score_globale < 4.8:
+            testo_feedback = "Molto bene! Il tuo livello di self-empowerment più alto ti mette nella condizione di affrontare le sfide che incontri con coraggio ed energia.  Ora considera i punteggi del fattore potere personale e killer psicologico e valuta se sia più utile rafforzare la tua auto efficacia e competenza, oppure lavorare a un migliore depotenziamento delle difficoltà soggettive."
+        else: # Punteggio >= 4.8 (Altissimo)
+            testo_feedback = "Attenzione! Un alto livello di self-empowerment è senz’altro utile per affrontare le sfide che incontri con coraggio ed energia. Tuttavia, non bisogna credere al miraggio dell’onnipotenza: un po’ di paura, incertezza, ansia ci aiutano a stare di fronte alle sfide con realismo e – quindi – affrontarle con baldanza ma senza eccessiva faciloneria. Considera il punteggi del fattore killer psicologico e valuta se averlo così basso è frutto di un buon lavoro sul pensiero negativo negative o, piuttosto, una negazione dei limiti personali."
+
+        st.write(testo_feedback)
+
+# --- FOOTER ---
+st.markdown("<br><br><br>", unsafe_allow_html=True)
+st.markdown("""
+<div style='text-align: center; color: grey;'>
+    Powered by GÉNERA
+</div>
+""", unsafe_allow_html=True)
