@@ -24,22 +24,23 @@ def connect_to_gsheet():
         creds_dict = st.secrets["gcp_service_account"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
         client = gspread.authorize(creds)
-        # Assicurati che il foglio si chiami esattamente così
         sheet = client.open("Database_Self_Empowerment").sheet1
         return sheet
     except Exception as e:
-        st.error(f"Errore connessione database: {e}")
+        # Log silenzioso in console (non visibile all'utente)
+        print(f"Errore connessione DB (Silenzioso): {e}")
         return None
 
 def save_data(data_row):
-    """Salva una riga di dati su Google Sheet"""
+    """Salva una riga di dati su Google Sheet in modo silenzioso"""
     sheet = connect_to_gsheet()
     if sheet:
         try:
             sheet.append_row(data_row)
             return True
         except Exception as e:
-            st.error(f"Errore salvataggio dati: {e}")
+            # Log silenzioso in console
+            print(f"Errore salvataggio riga (Silenzioso): {e}")
             return False
     return False
 
@@ -74,7 +75,8 @@ def create_gauge(value, title, min_v, max_v, ranges, colors):
 try:
     st.image("GENERA Logo Colore.png", use_container_width=True) 
 except:
-    st.warning("Immagine 'GENERA Logo Colore.png' non trovata.")
+    # Nessun errore visibile, solo un warning log
+    print("Immagine logo non trovata")
 
 st.title("Autovalutazione del Potere Personale")
 
@@ -119,9 +121,9 @@ with st.form("questionario_form"):
 
     st.markdown("---")
 
-    # --- QUESTIONARIO (SCALA LIKERT 5 PUNTI) ---
+    # --- QUESTIONARIO (SCALA LIKERT 6 PUNTI) ---
     st.subheader("Autovalutazione")
-    st.write("Valuta le seguenti affermazioni da **1 (Per nulla d'accordo)** a **5 (Totalmente d'accordo)**.")
+    st.write("Valuta le seguenti affermazioni da **1 (Per nulla d'accordo)** a **6 (Totalmente d'accordo)**.")
     
     domande = [
         "1) È meglio evitare di fare troppi progetti per il futuro e concentrarsi sul presente",
@@ -139,18 +141,23 @@ with st.form("questionario_form"):
         "13) Per lo più mi sembra di avere diverse possibilità tra cui scegliere"
     ]
     
-    # Scala a 5 Punti
+    # Scala a 6 Punti
     opzioni = [
         "1 - Per nulla d'accordo", 
-        "2 - Poco d'accordo", 
-        "3 - Né d'accordo né in disaccordo", # Punto Neutro aggiunto
-        "4 - Abbastanza d'accordo", 
-        "5 - Totalmente d'accordo"
+        "2 - Fortemente in disaccordo", 
+        "3 - In disaccordo", 
+        "4 - D'accordo", 
+        "5 - Fortemente d'accordo",
+        "6 - Totalmente d'accordo"
     ]
-    valori_mapping = {opzioni[0]: 1, opzioni[1]: 2, opzioni[2]: 3, opzioni[3]: 4, opzioni[4]: 5}
+    valori_mapping = {
+        opzioni[0]: 1, opzioni[1]: 2, opzioni[2]: 3, 
+        opzioni[3]: 4, opzioni[4]: 5, opzioni[5]: 6
+    }
     
     risposte = {}
     for i, domanda in enumerate(domande):
+        # select_slider permette di scegliere tra le opzioni testuali mappate poi a numeri
         risposta_txt = st.select_slider(domanda, options=opzioni, key=f"q{i}")
         risposte[i+1] = valori_mapping[risposta_txt]
 
@@ -162,16 +169,16 @@ if submitted:
         st.error("Per favore inserisci un nome o nickname.")
     else:
         # Indici Items (Python parte da 0)
-        idx_reverse = [1, 4, 5, 7] # Sono gli items negativi
+        idx_reverse = [1, 4, 5, 7] # Items negativi
         idx_potere = [2, 3, 6, 8, 9, 10, 11, 12, 13]
         idx_killer = [1, 4, 5, 7]
 
         punteggi_calcolati = {}
         
-        # Calcolo valori (Reverse su scala 5: 6 - voto)
+        # Calcolo valori (Reverse su scala 6: 7 - voto)
         for k, v in risposte.items():
             if k in idx_reverse:
-                punteggi_calcolati[k] = 6 - v # FORMULA AGGIORNATA PER SCALA 5
+                punteggi_calcolati[k] = 7 - v # FORMULA AGGIORNATA PER SCALA 6
             else:
                 punteggi_calcolati[k] = v
         
@@ -179,79 +186,77 @@ if submitted:
         scores_list = list(punteggi_calcolati.values())
         score_globale = np.mean(scores_list)
         
-        # Killer Psicologico (Uso valori grezzi: alto voto = alto killer)
+        # Killer Psicologico (Valori grezzi per "quanto è forte il killer")
         vals_killer_raw = [risposte[k] for k in idx_killer]
         score_killer = np.mean(vals_killer_raw)
         
-        # Sentimento Potere (Uso valori positivi)
+        # Sentimento Potere (Valori standard)
         vals_potere = [risposte[k] for k in idx_potere]
         score_potere = np.mean(vals_potere)
         
-        # --- SALVATAGGIO ---
+        # --- SALVATAGGIO SILENZIOSO ---
+        # Proviamo a salvare, se fallisce non diciamo nulla all'utente (richiesta specifica)
         user_id = datetime.now().strftime("%Y%m%d%H%M%S")
         row_data = [user_id, nome, genere, eta, titolo_studio, job]
         for i in range(1, 14):
             row_data.append(risposte[i])
             
-        save_success = save_data(row_data)
-        if not save_success:
-            st.warning("Impossibile salvare i dati, ma ecco il tuo profilo.")
+        save_data(row_data) # Chiamata senza controllo return visibile
 
         # --- FEEDBACK GRAFICO ---
         st.markdown("## Il tuo Profilo di Self-Empowerment")
         
-        # Quadrante 1: Globale (Scala 1-5)
-        # Soglie adattate: Basso <3.5, Medio 3.5-4.4, Alto >4.5
+        # Quadrante 1: Globale
+        # Ranges da Prompt originale: <3.5, 3.5-4.49, 4.5-5.5, >5.5
+        # Scala visuale max 6
         fig_globale = create_gauge(
             score_globale, 
             "Self-Empowerment Globale", 
-            1, 5, 
-            [1, 3.5, 4.5, 5], 
-            ["#FFCDD2", "#FFF9C4", "#C8E6C9"] 
+            1, 6, 
+            [1, 3.5, 4.5, 5.5, 6], 
+            ["#FFCDD2", "#FFF9C4", "#C8E6C9", "#2E7D32"] 
+            # Rosso, Giallo, Verde Chiaro, Verde Scuro
         )
         st.plotly_chart(fig_globale, use_container_width=True)
 
         col_g1, col_g2 = st.columns(2)
         
         with col_g1:
-            # Killer Psicologico - Cutoff 3 (Invariato)
+            # Killer Psicologico - Cutoff 3
             fig_killer = create_gauge(
                 score_killer,
                 "Killer Psicologici",
-                1, 5,
-                [1, 3, 5],
+                1, 6,
+                [1, 3, 6],
                 [COLOR_BG_GREEN, COLOR_BG_RED] 
             )
             st.plotly_chart(fig_killer, use_container_width=True)
             
         with col_g2:
-            # Sentimento di Potere - Cutoff 3 (Invariato)
+            # Sentimento di Potere - Cutoff 3
             fig_potere = create_gauge(
                 score_potere,
                 "Sentimento di Potere",
-                1, 5,
-                [1, 3, 5],
+                1, 6,
+                [1, 3, 6],
                 [COLOR_BG_RED, COLOR_BG_GREEN]
             )
             st.plotly_chart(fig_potere, use_container_width=True)
 
         # --- FEEDBACK NARRATIVO ---
         st.markdown("### Interpretazione")
-        st.info(f"Punteggio Globale: {score_globale:.2f}/5 | Potere: {score_potere:.2f}/5 | Killer: {score_killer:.2f}/5")
+        st.info(f"Punteggio Globale: {score_globale:.2f}/6 | Potere: {score_potere:.2f}/6 | Killer: {score_killer:.2f}/6")
 
         testo_feedback = ""
         
-        # LOGICA SOGLIE AGGIORNATA PER SCALA 5
-        # Nota: La richiesta originale aveva soglie > 5.5, impossibile qui.
-        # Ho ricalibrato l'ultimo livello per essere raggiungibile se il punteggio è > 4.7
-        
+        # LOGICA SOGLIE ESATTA DA PROMPT INIZIALE
         if score_globale < 3.5:
             testo_feedback = "Attenzione: è molto probabile che il tuo basso livello di self-empowerment ti impedisca di affrontare con coraggio ed energia le sfide che incontri sul cammino. Considera i punteggi del fattore potere personale e killer psicologico e valuta se la tua priorità sia rafforzare la tua auto efficacia e competenza, oppure lavorare a un depotenziamento delle difficoltà soggettive."
         elif 3.5 <= score_globale < 4.5:
             testo_feedback = "Bene ma non benissimo! Un livello di self-empowerment più alto potrebbe aiutarti ad affrontare le sfide in modo più coraggioso ed energico.  Considera i punteggi del fattore potere personale e killer psicologico e valuta se la tua priorità sia rafforzare la tua auto efficacia e competenza, oppure lavorare a un migliore depotenziamento delle difficoltà soggettive."
-        elif 4.5 <= score_globale < 4.8:
+        elif 4.5 <= score_globale <= 5.5:
             testo_feedback = "Molto bene! Il tuo livello di self-empowerment più alto ti mette nella condizione di affrontare le sfide che incontri con coraggio ed energia.  Ora considera i punteggi del fattore potere personale e killer psicologico e valuta se sia più utile rafforzare la tua auto efficacia e competenza, oppure lavorare a un migliore depotenziamento delle difficoltà soggettive."
-        else: # Punteggio >= 4.8 (Altissimo)
+        else: # > 5.5
             testo_feedback = "Attenzione! Un alto livello di self-empowerment è senz’altro utile per affrontare le sfide che incontri con coraggio ed energia. Tuttavia, non bisogna credere al miraggio dell’onnipotenza: un po’ di paura, incertezza, ansia ci aiutano a stare di fronte alle sfide con realismo e – quindi – affrontarle con baldanza ma senza eccessiva faciloneria. Considera il punteggi del fattore killer psicologico e valuta se averlo così basso è frutto di un buon lavoro sul pensiero negativo negative o, piuttosto, una negazione dei limiti personali."
 
         st.write(testo_feedback)
